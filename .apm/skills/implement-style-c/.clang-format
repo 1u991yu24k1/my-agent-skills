@@ -1,0 +1,25 @@
+BasedOnStyle: LLVM
+Language: Cpp
+
+IndentWidth: 4
+UseTab: Never
+ColumnLimit: 128
+PointerAlignment: Right
+IndentCaseLabels: true
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: Never
+  AfterCaseLabel: false
+  AfterStruct: false
+  BeforeElse: false
+
+SeparateDefinitionBlocks: Always
+
+Macros: [ "VA_ARGS" ]
+
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false

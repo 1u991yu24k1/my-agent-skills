@@ -1,0 +1,13 @@
+name: my-agent-skills
+version: "1.0.0"
+description: Shared agent skills for development and environment setup.
+author: 1u991yu24k1
+license: MIT
+
+includes: auto
+
+dependencies:
+  apm: []
+  mcp: []
+
+scripts: {}
