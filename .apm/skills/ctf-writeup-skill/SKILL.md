@@ -3,51 +3,72 @@ name: ctf-writeup-skill
 description : AI Agent が CTF challenge の writeup を記述するためのスキル. 
 ---
 
-Challenge を解き flag を得たタイミングで起動する.
-Challengeの名前, description, flag, 解析結果, Bug Class / Vulnerability,
-Exploit組み立て方針, Primitives の構築方法, 最終 Exploit 実行結果を md ファイルに残す.
+以下のタイミングで起動する. 
+* AI エージェントが CTF Challenge を解き flag を得たタイミングで起動する.
+* ローカルでupsolveしている場合は, リモートシェルが取れた場合(RCE) or ローカルのrootシェルが取れた場合(LPE).
+* ユーザが, 「writeup を記載して」,「解説記事書いて」とエージェントに依頼した場合.
 
-
-askUserQuestion / read_input により, writeup の言語を, 英語で記述するか, 日本語で記述するかを決めること. 
-日本語で記述する場合, `clear-japanese` スキルを使用して, 明瞭な日本語で記述すること. 
-> If `clear-japanese` is unavailable, report the missing dependency rather than silently substituting it.
-
-
-## 記載方式
-
-writeup を記述する際には, 以下規約を遵守する.
-
-* 文章は日本語で記載する.
-* markdown ファイルで記述する.
-* ファイル名は, `<カテゴリ>_<チャレンジ名>_writeup.md` とする.
-  * チャレンジ名に, ファイル名に使用できない文字がある場合は, チャレンジ名を正規化, サニタイズする.
+## 記事の体裁
+明示的に指定されない場合は, 以下のフォーマットで記述する. 
+* Markdown 1ファイルで記述する.
+  * ファイル名は, `<カテゴリ>_<チャレンジ名>_writeup.md` とする.
+  * 例:
+    * `pwnable_pwnme_writeup.md`
+    * `crypto_solve-cheap-rsa_writeup.md`
+    * `reversing_crackme_writeup.md`
+    * `web_exploit_ssrf_writeup.md`
+  * チャレンジ名に, ファイル名として使用できない文字がある場合は, 名前を正規化/サニタイズすること. 
+* 内容は, 特に指定しない限り日本語で記述する. 
 
 ## 記載内容
 
-以下を必ず含める.
+記事内には, 以下を必ず含める.
 
-1. 解析結果の実際のコマンド, スクリプト結果.
-2. Challenge の Root Cause となる Bug Class とそれを発火させる最小の PoC.
-3. Exploit 組み立て方針.
-4. Exploit 成功に必要な 各種primitives, Mitigation bypasses.
-5. Flag を求解するための, Final Exploit と実行結果
-6. 得られた flag 
-7. Challenge に対する Key Findings.
+* Challengeの情報
+  * チャレンジ名
+  * description
+* チャンレンジの解析結果
+  * スクリプトやコマンドの実行結果
+  * Root Cause となる Bug Class / Vulnerabilityとそれを発火させるPoC
+* Exploit方針組み立て過程
+  * Primitives の構築方法
+  * mitigation bypass方法
+  * RCE / LPE / VMEscapeを達成するペイロードの方針
+* 最終 Exploit Codeと その実行結果. 
+* flag (取得できた場合のみ. もしupsolveや練習でflagがない場合は, その旨を記載)
+* Challenge に対する Key Findings.
 
-### 解析結果の実際のコマンド, スクリプト結果
+### Challengeの情報
+チャレンジの名前, Descriptionを記載する. 
+もし, connect info や, 別サイトへのリンク参照がある場合は, それも記載する. 
+また, チャレンジの配布物も `tree`コマンド方式で記載する. 
 
+### チャンレンジの解析結果
+チャレンジの初動解析, Root Cause, その発火方法を端的に書く. 
+
+初動解析で書くべきは, 例えば以下のようなもの. 
+* fileコマンド結果
+* Dockerfileの中身や, libcのバージョン情報.
+* ソースコードが添付されている場合は, `main`ロジック部分.
+* checksecコマンド結果 (bata24/gefの checksecコマンドが望ましい. 例は後述)
+* チャレンジを起動するためのコマンド.
+  * 例えば, `docker`の起動方法や, kernel exploit challenge なら `run.sh`の中身や, `qemu-system`の起動コマンド.
+  * リモートに `nc`でつなぎに行ったときの挙動など.
+  * また, ソースが添付されていないバイナリなら, `main`ロジックを, Decompileした疑似コードなども有用.
+    
+> [!Warning]
+> `main`ロジックとは必ずしも `main`関数を意味しない.
+> チャレンジアプリケーションのコアロジックを実装しているコードブロック全般を指す. `main`関数でなくてもよい.
+
+#### スクリプトやコマンドの実行結果
 解析結果は, 要約サマリだけでなく実行したコマンドの証跡を載せる.
-
 * 悪い例
-
 ```
 配布されたバイナリは, PIE + NX 有効.
 ```
-
 * 良い例
-
 ```
-checksec 実行結果 : `gdb -ex checksec ./chall`
+checksec 実行結果(`gdb -ex checksec ./chall`)
 (ctf-venv) root@Ubu2604x64:pwn_chall1# gdb -ex 'checksec' ./chall
 Loading GEF...
 GEF is ready, type 'gef' to start, 'gef config' to configure
@@ -73,33 +94,41 @@ gef>
 配布されたバイナリは, Static PIE + NX
 ```
 
-コマンド結果の全てを載せる必要はないが, writeup の読み手が,
-
+コマンド結果の全てを載せる必要はないが, writeup の読み手が以下を判断できることが重要. 
 * どのようなコマンド打つのか
 * そのコマンドの結果のどこに着目するべきか
 
-を, 判断できること.
-
 ### Challenge の Root Cause となる Bug Class とそれを発火させる最小の PoC
 
-悪い例.
+Root Cause Analysisでは, 必ずBug Classと発火させる最小PoCを含める. 
 
+また, 以下を遵守すること. 
+* 自然言語だけの説明ではなく, 図解や転記コードにコメントを入れて実コードとの突合を踏まえて記載するのが望ましい.
+  * race condition や data race を説明する場合, 文字だけでなく, UML シーケンス図 (mermaidが望ましい)を記載すること. 
+* PoCのコード全体は別コードにしてもよい. ただしPoCの理解に必要な部分はドキュメント内に Inline Code Blockで記載すること. 
+* PoCのコードだけでなく, PoC自体を実行した結果も載せること.
+* AOT コンパイルなどで実行前にビルド処理や, 前処理が必要な場合はそれも記載すること.
+* 別途ライブラリのインストールが必要な場合は, インストール方法を記載すること.
+  * ユーザの実行環境は Ubuntu の最新LTSバージョン (2026/10時点で, 26.04 LTS). x86_64を使用していると想定して良い.
+  * aptでインストールする or ソースコードからビルドする.  
+  * pythonは, uv をインストールしていると仮定して, インストールコマンドを記載すること. (`uv pip install ...`)
+  * 尚, `pwntools` は例外としてよい.
+
+**悪い例**
 ```
 関数 XXX の stack BOF がRoot Cause.
 ```
 
-良い例
-
+**良い例**
 ```
 関数 XXX には, Stack BOF の脆弱性がある. スタックバッファが, 20 bytes 固定なのに対して, 
 `read`関数で, 64 bytes を読み込む. 
 ```
 
-また, race condition や data race を説明する場合, 文字だけでなく, UML シーケンス図 (mermaidが望ましい)を記載すること.
+また, 
 
 PoC は, 実コードを交えて説明する場合,
 boiler plate コード(例: `from pwn import *` とか `#include <stdio.h>` とか)は省略して良い.
-
 
 また, `objdump`や, `gdb`の crash 時 context 出力も, 出力結果全てを載せる必要はない.
 > 例えば, 脆弱性を持つ関数のみを載せる, stack contextと code context だけ載せるなどの, 重要部分だけをトリアージして記載して良い. 
@@ -107,20 +136,51 @@ boiler plate コード(例: `from pwn import *` とか `#include <stdio.h>` と�
 
 ただし, コマンド結果を載せる場合は, コピペして後から同じ実行結果が得られるようにオプションなどを含めて記載すること.
 
-## Exploit 組み立て方針
-方針の組み立てロジックの構築には必ず根拠となった理由を示すこと. 
-また, 複数の方針を試して, 実験や検証により棄却した方針などがあれば, それも記載する. 
-また, 複数方針を検討し, どちらの方針でも Exploit が成功する場合も その旨記載する. 
-
-## Exploit 成功に必要な 各種primitives, Mitigation bypasses
+### Exploit方針組み立て過程
 何ができれば RCE / LPE / SBX Escape できるのかを具体的に記述する. 
+方針の組み立てロジック構築には, 必ず根拠となった理由を示すこと. 
+また以下の内容も記載すること. 
+* 複数の方針を試して, 実験や検証により棄却した方針がある場合, 棄却した理由を記載する.
+* 複数方針を検討し, 複数の方針で Exploit が成功する場合, 別解として記載する.  
+
+
+#### Primitives の構築方法
+まず組み立てに伴い, どのようなprimitiveが構築できればよいかを記載すること.
+複数種 or 複数回の限定的な Primitives をより強力な primitives に拡張できるか? 
+それとも, 限定的な Primitives のみで Exploit完了まで持っていけるか？など, 
+Exploitの Step毎に必要な Primitive内容を説明すること. 
+
 また AAR / AAW / AddrOf / FakeObj などの強力な primives 作成を説明する際には, 
 それぞれ前提として想定しているメモリのレイアウトを図示すること. 
 
-## Flag を求解するための, Final Exploit
+#### mitigation bypass方法
+* ASLR / KASLR(Virtual/Physical) のバイパスは必要か？
+* Cage Sandboxを抜けられるか?
+* SMEP/SMAP/CET などの CPU 固有の mitigationを回避できるか？
+* CONFIG_STATIC_USERMODE_HELPER や CONFIG_SLAB_VIRTUAL, COFNIG_KMALLOC_RANDOM_CACHESなどのkernelのmitigationを回避できるか?
+
+#### RCE / LPE / VMEscapeを達成するペイロードの方針
+最終的な リモートshell実行, ローカルのroot実行, ホストシェル実行に繋げるには, どのようなペイロードが実行できればよいか？という観点で
+記載する. 
+例えば観点は以下の通り. 
+* シェルコードを直接実行できるか?
+* ROP/COP/JOPから `system("/bin/sh")`, `execve("/bin/sh", NULL, NULL)`できるか? / `commit_creds(prepare_kernel_creds(&init_creds))` or cred=0できるか?
+* one_gadgetは有効か？
+* BPF JITに jmp / ret できるか？
+* Physicalメモリを書き換えられるか?
+* Page Tableを書き換え可能か？
+* Dirty Pipeテクニック, PipeBufferテクニックは使用可能か？
+* ユーザランドに戻った場合に, 別のアクションが必要か?
+* 別namespaceへのslideが必要か？
+* ページキャッシュは書き換え可能か？
+
+ここは前説の, [Primitives の構築方法], [mitigation bypass方法] と深く関わる内容であるため, 必ずしも章立てはこの通りにしなくても良い. 
+
+## 最終 Exploit Codeと その実行結果
 最終的な Exploit コードを記載すること. 
 ただし, 解析, 推論によってすでに別ファイルとして Final Exploit が存在する場合, そのファイルへの参照パスを記載すること.
-ここでの成果物は, 必ずソースコードであり人間が可読可能であること. (LPE などで バイナリをそのまま配置するのは NG )
+その場合は, `main`ロジックのみだけでも, Inline Code Blockに含めること. 
+> ここでの成果物は, 必ずソースコードであり人間が可読可能であること. (LPE などで バイナリをそのまま配置するのは NG )
 
 また、**実行結果も記載すること** . 
 
@@ -145,7 +205,8 @@ LPE などで Exploit Code が C 言語の場合には, 以下も記述するこ
 
 ## 得られた flag 
 Exploit の実行結果から, 得られた flag を 見やすい形で記載すること. 
+尚, upsolveやローカルでの実行で, flagがない場合は, その旨を記載すること. 
 
 ## Challenge に対する Key Findings
-この問題を求解する上で, 理解しておくべき技術的/概念的エッセンス, 知っておくべき概念, 調査しておくべきドキュメント, 題材として扱ったプロジェクトを記載する. 
+この問題を求解する上で, 理解しておくべき技術的/概念的エッセンス, 知っておくべき概念, 調査しておくべきドキュメント, 題材として扱ったプロジェクト, CVEを記載する. 
  
