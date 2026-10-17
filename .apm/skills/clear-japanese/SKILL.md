@@ -52,3 +52,5 @@ description: 日本語の返答や文書を明瞭かつ簡潔に書く. 日本�
 * 全体像を説明する場合は, 図を入れること.
   * `mermaid`で作図する  
   * TextのCode Blockを作成し, そこで図示してもよい. 
+
+* @references/bad_statements.md をアンチパターンにすること. 
