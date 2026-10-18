@@ -24,20 +24,20 @@ module exit は online flag を落とし, 全 probe を unregister して grace 
 
 中身を読むと, 
 
-* `module exit`は, `rmmod` 実行時に呼び出される, Device Driverの `module_exit()` マクロのこと. 
-* `online flag`は, グローバル配列 `probes[]` の要素である`sensor_probe` 構造体の `registered` メンバのこと.  
-* `probe`は同じく, グローバル配列 `probes[]`のこと. 全 `probe`とは, 配列の全要素を指す. 
-* `unregister`とは, `unregister_probes()`を呼び出すこと. 
-* `grace period`とは, カーネルの非同期処理が完了し, 同期的に安全に終了できるまでの期限のこと. 
+* `module exit` は, `rmmod` 実行時に呼び出される, Device Driverの `module_exit()` マクロのこと. 
+* `online flag` は, グローバル配列 `probes[]` の要素である `sensor_probe` 構造体の `registered` メンバのこと.  
+* `probe` は, 同じくグローバル配列 `probes[]` のこと. 全 `probe` とは配列の全要素を指す. 
+* `unregister` は, `unregister_probes()` を呼び出すこと. 
+* `grace period` とは, カーネルの非同期処理が完了し, 同期的に安全に終了できるまでの期限のこと. 
   `tracepoint_synchronize_unregister()` というカーネル内の関数を呼び出す. 
 
 つまり, 言いたいことは以下である. 
 ```
-`rmmod`などのドライバアンロード時に, `module_exit`内で, `unregister_probes()`を呼び出し, 内部で以下の処理を行う. 
-1. グローバル配列 `probes[]` の`registered`な要素に対して, 
-  - `tracepoint_probe_unregister()`を呼び出し, 
-  - `probes[i].registered`をクリアする.  
-2. `tracepoint_synchronize_unregister()`を呼び出し, 同期的にドライバをアンロードできるまで待つ. 
+`rmmod`などのドライバアンロード時に, `module_exit` 内で `unregister_probes()` を呼び出し, 内部で以下の処理を行う. 
+1. グローバル配列 `probes[]` の `registered` な要素に対して, 
+  - `tracepoint_probe_unregister()` を呼び出し, 
+  - `probes[i].registered` をクリアする.  
+2. `tracepoint_synchronize_unregister()` を呼び出し, 同期的にドライバをアンロードできるまで待つ. 
 ```
 
 これは, 由来不明な英単語が存在しない. 
