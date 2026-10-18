@@ -55,4 +55,4 @@ description: 日本語の返答や文書を明瞭かつ簡潔に書く. 日本�
   * `mermaid`で作図する  
   * TextのCode Blockを作成し, そこで図示してもよい. 
 
-* @references/bad_statements.md をアンチパターンにすること. 
+* [@references/bad_statements.md](./references/bad_statements.md) をアンチパターンにすること. 
