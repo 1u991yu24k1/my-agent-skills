@@ -65,6 +65,7 @@ Build PHP interpreter by ASAN, UBSAN enabled with debug symbol
     make -j$(nproc)
     make install 
     ```
+
 4. check sanitizer is enabled
   - check commands
     * `ls -al <path>/<to>/<php-build>`
@@ -73,12 +74,13 @@ Build PHP interpreter by ASAN, UBSAN enabled with debug symbol
     * ```shell
       ASAN_OPTIONS="verbosity=1:detect_leaks=0" ./sbin/php-fpm -v 2>&1 | grep -E 'AddressSanitizer Init done|SHADOW_OFFSET|SHADOW_SCALE'
       # output example
-      # root@Ubu2604x64:php-asan# ASAN_OPTIONS="verbosity=1:detect_leaks=0" ./sbin/php-fpm -v 2>&1 | grep -E 'AddressSanitizer Init done|SHADOW_OFFSET|SHADOW_SCALE'
-      # SHADOW_SCALE: 3
-      # SHADOW_OFFSET: 0x00007fff8000
-      # ==1154844==AddressSanitizer Init done
-      # root@Ubu2604x64:php-asan# 
+      #   root@Ubu2604x64:php-asan# ASAN_OPTIONS="verbosity=1:detect_leaks=0" ./sbin/php-fpm -v 2>&1 | grep -E 'AddressSanitizer Init done|SHADOW_OFFSET|SHADOW_SCALE'
+      #   SHADOW_SCALE: 3
+      #   SHADOW_OFFSET: 0x00007fff8000
+      #   ==1154844==AddressSanitizer Init done
+      #   root@Ubu2604x64:php-asan# 
       ```
+
 ## Environment 
 You can debug php interpreter both with apache and nginx, or debug by standalone.
 
