@@ -160,6 +160,7 @@ XFRM経路をkernelで動的に実行した証拠ではない.
 
 ## mermaidによる図解表現で避けるべき表現
 単純な分岐なしをmermaidの図にするべきではない. 
+
 例えば以下は, codex が作成した mermaid図である. 
 ```mermaid
 flowchart TD
@@ -175,3 +176,25 @@ flowchart TD
     J --> K[zend_op_array]
     K --> L[zend_execute]
 ```
+この図は php のコード実行パスを示しているが分岐がない.
+
+mermaid 図はスペースを取るので,  単純なコード実行パスであれば, 以下のフォーマットのようにindentによる表現が好ましい.
+
+修正案
+```
+php_execute_script_ex()
+  → zend_execute_script()
+    → zend_compile_file()
+      → compile_file()
+        → open_file_for_scanning()
+          → zend_compile()
+            → zendparse() ★ CG の ast に構文木を作る
+              → zend_compile_ast_internal()
+                → zend_compile_top_stmt()
+                  → zend_op_array()
+                    → zend_execute()
+```
+* 1段呼び出し毎に 2文字のスペースを空けること
+
+尚, このコードの実行パスを Inline Block で表現する場合は, 1行あたり 70文字制限は無視して良い.  
+
