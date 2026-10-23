@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """clear-japanese 用の機械検査. 標準ライブラリのみ.
 
-使い方: python3 lint_ja.py [--no-info] [--max-width N] [--allow-log] [--all] FILE...
+使い方: python3 lint_ja.py [--no-info] [--max-width N] [--allow-log] [--all]
+                         [--profile general|tech] FILE...
 --max-width は端末向けの出力を検査するときだけ指定する(例: 70).
 --allow-log は検証記録など, 作業の経緯を書いてよい文書で作業ログ語の検査を外す.
 --all は同じ種類の FAIL を省略せずに全件表示する(既定は種類ごとに15件).
+--profile tech は実装を読む技術資料向けの検査(作業環境の絶対パスなど)を足す.
+既定の general は会話や一般文書向けで, 技術資料向けの検査を行わない.
 FAIL があれば終了コード 1. INFO は人手で確認する参考出力.
 """
 import argparse
@@ -46,6 +49,10 @@ VARIANT_PAIRS = [
     ("slot", "スロット"), ("node", "ノード"), ("key", "キー"),
     ("lock", "ロック"), ("thread", "スレッド"), ("pointer", "ポインタ"),
 ]
+ABS_PATH = re.compile(r"(?<![\w.~])/(?:root|home|mnt|Users)/[\w.\-/]+")
+ACRONYM = re.compile(r"\b[A-Z][A-Z0-9]{2,}\b")
+ACRONYM_DEFINED = re.compile(r"(\(|（|とは|の略|を表す|を指す|である)")
+TECH_MAX_LINES = 600
 MAX_SENTENCE = 100
 MAX_NEGATIVE_RATE = 0.10
 MAX_ENGLISH_DENSITY = 3.0
@@ -126,7 +133,7 @@ def sentences_of(buffer):
     return [p for p in parts if p]
 
 
-def check_file(path, show_info, max_width, allow_log, show_all):
+def check_file(path, show_info, max_width, allow_log, show_all, profile="general"):
     with open(path, encoding="utf-8") as f:
         lines = f.read().split("\n")
     fails, infos = [], []
@@ -139,6 +146,9 @@ def check_file(path, show_info, max_width, allow_log, show_all):
     jp_chars = 0
     eng_words = 0
     variants_en = {}
+    tech = profile == "tech"
+    section_forward = 0
+    seen_acronyms = {}
 
     def flush():
         nonlocal buffer
@@ -209,6 +219,21 @@ def check_file(path, show_info, max_width, allow_log, show_all):
 
         text_plain = INLINE_CODE.sub(" ", body)
         text_plain = re.sub(r"https?://\S+", " ", text_plain)
+
+        if tech:
+            m = ABS_PATH.search(line)
+            if m:
+                fails.append((n, f"作業環境の絶対パス '{m.group(0)}' を本文に書かない. "
+                              "版と取得元を書き, ローカルの場所は frontmatter に置く", "絶対パス"))
+            if h and len(h.group(1)) <= 2:
+                section_forward = 0
+            section_forward += text_plain.count("後述")
+            if section_forward == 2 and "後述" in text_plain:
+                infos.append((n, "同じ節で '後述' が2回目. 定義を先に書けないか確認"))
+            for am in ACRONYM.finditer(text_plain):
+                w = am.group(0)
+                if w not in seen_acronyms:
+                    seen_acronyms[w] = (n, bool(ACRONYM_DEFINED.search(text_plain)))
 
         if re.search(r"\s/\s", text_plain):
             fails.append((n, "' / ' で語を並べず, 文か箇条書きで書く", "スラッシュ列挙"))
@@ -284,6 +309,13 @@ def check_file(path, show_info, max_width, allow_log, show_all):
         if missing:
             infos.append((1, "冒頭200字に主題語がない: " + ", ".join(missing)))
 
+    if tech:
+        if len(lines) > TECH_MAX_LINES:
+            infos.append((0, f"{len(lines)} 行. {TECH_MAX_LINES} 行を超える. 節ごとにページを分けられないか確認"))
+        undefined = [f"{w}({n})" for w, (n, ok) in seen_acronyms.items() if not ok]
+        if undefined:
+            infos.append((0, "初出で定義が近くにない略語: " + ", ".join(undefined[:20])))
+
     if first_ascii:
         words = ", ".join(f"{w}({n})" for n, w in first_ascii.values())
         infos.append((0, "初出の英単語. 定義か実在の識別子か確認: " + words))
@@ -312,10 +344,11 @@ def main():
     ap.add_argument("--max-width", type=int, default=0)
     ap.add_argument("--allow-log", action="store_true")
     ap.add_argument("--all", action="store_true")
+    ap.add_argument("--profile", choices=("general", "tech"), default="general")
     ap.add_argument("files", nargs="+")
     args = ap.parse_args()
     total = sum(
-        check_file(p, not args.no_info, args.max_width, args.allow_log, args.all)
+        check_file(p, not args.no_info, args.max_width, args.allow_log, args.all, args.profile)
         for p in args.files
     )
     print(f"FAIL: {total}")

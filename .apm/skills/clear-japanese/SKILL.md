@@ -25,8 +25,8 @@ description: 日本語の応答と文書を, 明瞭, 簡潔, LLM 口調なしで
 9. 事実, 推論, 未確認事項を区別し, 未実行の作業を完了形で書かない.
 10. 本文に作業の経緯を書かない. `指定された`, `今回`, `ユーザー指定`,
     `作業範囲`, `確認した`, `未実施` は使わない. 検証状況は別ページに分ける.
-11. メモリ配置図の枠, 区画, 矢印ラベルには ASCII 文字だけを使う.
-    日本語の説明は図外へ置く. 作図時は `references/memory-layout.md` を読む.
+11. 等幅の図(メモリ配置図など)は ASCII 文字だけで描き, 日本語の説明を図外へ置く.
+    作図時は `references/memory-layout.md` を読む.
 12. 解説資料は, 冒頭に定義, 対象読者, 前提知識, 範囲を書く.
     性質を主張したら, 同じ節に根拠を書く.
 
@@ -38,9 +38,22 @@ description: 日本語の応答と文書を, 明瞭, 簡潔, LLM 口調なしで
 3. 書き終えたら `python3 scripts/lint_ja.py <file>` を実行する.
    `FAIL` はすべて直す. `INFO` は `references/checklist.md` で確認する.
    検証記録のページは `--allow-log` を付ける.
+   実装を読む技術資料は `--profile tech` を付ける.
+   ` ```text ` の図を含む文書は `python3 scripts/check_diagrams.py <file>` も実行する.
 4. 解説資料は, lint の後に, 前提知識のない読者として1節ずつ読み直す.
    つまずいた語と文を直す. lint は表記しか検査しない.
 5. 会話の回答は短いので, lint を省略して必須規則だけで確認してよい.
+6. `scripts/` を変更したら `python3 scripts/test_lint.py` を実行する.
+
+# 文書種別ごとの追加規則
+
+必須規則は全文書に適用する. 次の規則は, 表の場面でだけ適用する.
+
+| 場面 | 追加の規則 | 検査 |
+|------|------------|------|
+| 実装を読む技術資料 | `references/implementation-explanations.md` に従う. 本文には対象の版と取得元(`linux-7.2.8` など)だけを書き, ローカルの絶対パスは frontmatter の `source_tree:` に置く | `lint_ja.py --profile tech` |
+| 等幅の図を含む文書 | 幅は80桁以内にし, 枠の右端をそろえる. 経路図の `#` は最長のコードの1文字後に置く | `check_diagrams.py` |
+| 会話, 一般文書 | 追加の規則はない. `--profile` を付けない | `lint_ja.py` |
 
 # 読込表
 
@@ -50,6 +63,7 @@ description: 日本語の応答と文書を, 明瞭, 簡潔, LLM 口調なしで
 | 技術用語を含む文書 | `references/terminology.md` |
 | 見出しを持つ文書, 解説, 報告 | `references/structure.md` |
 | 文体, 表記, 行の長さ, コードの説明 | `references/writing_rules.md` |
+| 実装を読む技術資料(経路, 抜粋, 観測点) | `references/implementation-explanations.md` |
 | メモリ配置図, 構造体やポインタの参照図 | `references/memory-layout.md` |
 | 推敲 | `references/bad_statements.md` |
 | 書き方に迷ったとき | `references/good_examples.md` |
