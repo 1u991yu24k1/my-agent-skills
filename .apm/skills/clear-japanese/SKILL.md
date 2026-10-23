@@ -40,6 +40,7 @@ description: 日本語の応答と文書を, 明瞭, 簡潔, LLM 口調なしで
    検証記録のページは `--allow-log` を付ける.
    実装を読む技術資料は `--profile tech` を付ける.
    ` ```text ` の図を含む文書は `python3 scripts/check_diagrams.py <file>` も実行する.
+   ソースツリーがあり抜粋を含む文書は `python3 scripts/check_excerpt.py --tree <dir> <file>` も実行する.
 4. 解説資料は, lint の後に, 前提知識のない読者として1節ずつ読み直す.
    つまずいた語と文を直す. lint は表記しか検査しない.
 5. 会話の回答は短いので, lint を省略して必須規則だけで確認してよい.
@@ -53,6 +54,7 @@ description: 日本語の応答と文書を, 明瞭, 簡潔, LLM 口調なしで
 |------|------------|------|
 | 実装を読む技術資料 | `references/implementation-explanations.md` に従う. 本文には対象の版と取得元(`linux-7.2.8` など)だけを書き, ローカルの絶対パスは frontmatter の `source_tree:` に置く | `lint_ja.py --profile tech` |
 | 等幅の図を含む文書 | 幅は80桁以内にし, 枠の右端をそろえる. 経路図の `#` は最長のコードの1文字後に置く | `check_diagrams.py` |
+| Obsidian のノート | `references/obsidian.md` に従う | `lint_ja.py` |
 | 会話, 一般文書 | 追加の規則はない. `--profile` を付けない | `lint_ja.py` |
 
 # 読込表
@@ -64,6 +66,7 @@ description: 日本語の応答と文書を, 明瞭, 簡潔, LLM 口調なしで
 | 見出しを持つ文書, 解説, 報告 | `references/structure.md` |
 | 文体, 表記, 行の長さ, コードの説明 | `references/writing_rules.md` |
 | 実装を読む技術資料(経路, 抜粋, 観測点) | `references/implementation-explanations.md` |
+| Obsidian の vault 内のノートを作成, 編集 | `references/obsidian.md` |
 | メモリ配置図, 構造体やポインタの参照図 | `references/memory-layout.md` |
 | 推敲 | `references/bad_statements.md` |
 | 書き方に迷ったとき | `references/good_examples.md` |

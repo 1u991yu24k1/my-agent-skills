@@ -203,7 +203,8 @@ def check_file(path, show_info, max_width, allow_log, show_all, profile="general
             body = clean(text)
         elif is_table:
             flush()
-            body = " ".join(clean(c) for c in stripped.strip("|").split("|"))
+            cells = re.split(r"(?<!\\)\|", stripped.strip("|"))
+            body = " ".join(clean(c.replace("\\|", "|")) for c in cells)
         else:
             body = clean(line)
             if only_links(stripped):

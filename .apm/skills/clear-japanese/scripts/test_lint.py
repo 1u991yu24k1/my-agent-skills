@@ -14,6 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
 LINT = os.path.join(HERE, "lint_ja.py")
 DIAG = os.path.join(HERE, "check_diagrams.py")
+EXCERPT = os.path.join(HERE, "check_excerpt.py")
 
 GOOD_DOC = """# 赤黒木
 
@@ -73,6 +74,28 @@ CALL_GOOD = """```text
 __x64_sys_pipe2 # def fs/pipe.c:1152
   do_pipe2      # def fs/pipe.c:1130
 ```
+"""
+
+
+TABLE_LINK_DOC = """# 木
+
+木は, 階層を表すデータ構造である.
+本ページは, リンクの書き方を説明する.
+前提知識は, 表の書き方である.
+
+## リンクの例
+
+| ページ | 内容 |
+|--------|------|
+| [[tree\\|木]] | 階層を持つ構造 |
+| [[list\\|リスト]] | 並びを持つ構造 |
+"""
+
+SOURCE_C = """int main(void)
+{
+\tint x = 1; /* 初期値 */
+\treturn x;
+}
 """
 
 
@@ -144,6 +167,50 @@ class LintTech(Fixture):
         self.assertEqual(rc, 0, out)
 
 
+class TableEscape(Fixture):
+    def test_escaped_pipe_in_wikilink_is_not_a_separator(self):
+        rc, out = self.lint(TABLE_LINK_DOC, "--no-info", "--all")
+        self.assertEqual(rc, 0, out)
+
+
+class Excerpt(Fixture):
+    def tree(self):
+        os.makedirs(os.path.join(self.tmp.name, "src"), exist_ok=True)
+        with open(os.path.join(self.tmp.name, "src", "a.c"), "w", encoding="utf-8") as f:
+            f.write(SOURCE_C)
+        return self.tmp.name
+
+    def doc(self, code, ref="`src/a.c:3-4`"):
+        return f"# 抜粋\n\n{ref} から抜粋する.\n\n```c\n{code}```\n"
+
+    def test_matching_excerpt_passes(self):
+        tree = self.tree()
+        text = self.doc("/* 日本語コメント */\nint x = 1;\nreturn x;\n")
+        rc, out = run(EXCERPT, ["--tree", tree, self.write(text)])
+        self.assertEqual(rc, 0, out)
+
+    def test_changed_line_fails(self):
+        tree = self.tree()
+        text = self.doc("int x = 2;\n")
+        rc, out = run(EXCERPT, ["--tree", tree, self.write(text)])
+        self.assertEqual(rc, 1)
+        self.assertIn("にない行", out)
+
+    def test_missing_source_file_fails(self):
+        tree = self.tree()
+        text = self.doc("int x = 1;\n", ref="`src/none.c:1-2`")
+        rc, out = run(EXCERPT, ["--tree", tree, self.write(text)])
+        self.assertEqual(rc, 1)
+        self.assertIn("ツリーにない", out)
+
+    def test_block_without_reference_is_info(self):
+        tree = self.tree()
+        text = "# 抜粋\n\n```c\nint x;\n```\n"
+        rc, out = run(EXCERPT, ["--tree", tree, self.write(text)])
+        self.assertEqual(rc, 0, out)
+        self.assertIn("出典", out)
+
+
 class Diagrams(Fixture):
     def test_good_diagram_passes(self):
         rc, out = self.diag(DIAGRAM_GOOD)
@@ -206,6 +273,11 @@ class SkillIntegrity(unittest.TestCase):
     def test_skill_md_references_existing_files(self):
         with open(os.path.join(SKILL, "SKILL.md"), encoding="utf-8") as f:
             text = f.read()
+        refs = [line.split("`")[1] for line in text.split("\n")
+                if line.startswith("| ") and "`references/" in line]
+        self.assertTrue(refs)
+        for ref in refs:
+            self.assertTrue(os.path.exists(os.path.join(SKILL, ref)), ref)
         for ref in ("references/explainer.md", "references/memory-layout.md",
                     "scripts/lint_ja.py"):
             self.assertIn(ref, text)
