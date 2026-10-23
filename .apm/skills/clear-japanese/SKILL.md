@@ -25,7 +25,9 @@ description: 日本語の応答と文書を, 明瞭, 簡潔, LLM 口調なしで
 9. 事実, 推論, 未確認事項を区別し, 未実行の作業を完了形で書かない.
 10. 本文に作業の経緯を書かない. `指定された`, `今回`, `ユーザー指定`,
     `作業範囲`, `確認した`, `未実施` は使わない. 検証状況は別ページに分ける.
-11. 解説資料は, 冒頭に定義, 対象読者, 前提知識, 範囲を書く.
+11. メモリ配置図の枠, 区画, 矢印ラベルには ASCII 文字だけを使う.
+    日本語の説明は図外へ置く. 作図時は `references/memory-layout.md` を読む.
+12. 解説資料は, 冒頭に定義, 対象読者, 前提知識, 範囲を書く.
     性質を主張したら, 同じ節に根拠を書く.
 
 # 手順
@@ -48,6 +50,7 @@ description: 日本語の応答と文書を, 明瞭, 簡潔, LLM 口調なしで
 | 技術用語を含む文書 | `references/terminology.md` |
 | 見出しを持つ文書, 解説, 報告 | `references/structure.md` |
 | 文体, 表記, 行の長さ, コードの説明 | `references/writing_rules.md` |
+| メモリ配置図, 構造体やポインタの参照図 | `references/memory-layout.md` |
 | 推敲 | `references/bad_statements.md` |
 | 書き方に迷ったとき | `references/good_examples.md` |
 | 出力の直前 | `references/checklist.md` |
