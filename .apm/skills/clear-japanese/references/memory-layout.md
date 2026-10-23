@@ -260,7 +260,7 @@ new bufs                      pages (same PgA, PgB)
 どちらも `A0` と `A2` が空きで, `A1` と `A3` が使用中である.
 
 ```text
-[F0] freelist: free objects form a chain
+[F0] freelist
 
 kmem_cache_cpu         slab A
 +--------------+       +-----------+-----------+-----------+-----------+
@@ -270,7 +270,7 @@ kmem_cache_cpu         slab A
 ```
 
 ```text
-[F1] sheaf: an array holds pointers to free objects
+[F1] sheaf
 
 slub_percpu_sheaves    slab_sheaf (main)       slab A
 +-------------+        +-----------------+     +------------+------------+
