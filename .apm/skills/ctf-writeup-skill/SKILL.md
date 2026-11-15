@@ -19,6 +19,7 @@ description : AI Agent が CTF challenge の writeup を記述するためのス
     * `web_exploit_ssrf_writeup.md`
   * チャレンジ名に, ファイル名として使用できない文字がある場合は, 名前を正規化/サニタイズすること. 
 * 内容は, 特に指定しない限り日本語で記述する. 
+* 文章の構成, 説明の順序, 図と抜粋の書き方は, clear-japanese skill の `references/genres/ctf-writeup.md` に従う. 本 skill は, 記事に含める内容を定める.
 
 ## 記載内容
 

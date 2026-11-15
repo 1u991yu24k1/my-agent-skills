@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""lint_ja.py と check_diagrams.py の回帰試験. 標準ライブラリのみ.
+"""lint_ja.py, outline_ja.py, check_diagrams.py, check_excerpt.py, check_doc.py の回帰試験.
+標準ライブラリのみ.
 
 使い方: python3 test_lint.py
 fixture を一時ディレクトリに書き, 各検査が発火し, 誤検知しないことを確認する.
@@ -15,6 +16,8 @@ SKILL = os.path.dirname(HERE)
 LINT = os.path.join(HERE, "lint_ja.py")
 DIAG = os.path.join(HERE, "check_diagrams.py")
 EXCERPT = os.path.join(HERE, "check_excerpt.py")
+OUTLINE = os.path.join(HERE, "outline_ja.py")
+CHECKDOC = os.path.join(HERE, "check_doc.py")
 
 GOOD_DOC = """# 赤黒木
 
@@ -267,8 +270,262 @@ class Diagrams(Fixture):
         self.assertEqual(rc, 0, out)
 
 
+LEAD_DOC = """# 試験
+
+試験は, 検査を確かめる文書である.
+
+## 節
+
+次のコードは, 変数を宣言する.
+
+```c
+int x;
+```
+"""
+
+OUTLINE_PREVIEW = """# 書き込み
+
+書き込みは, データを渡す操作である.
+
+## 経路
+
+本節では, 書き込みの経路を説明する.
+
+経路は3段で構成する.
+"""
+
+OUTLINE_GOOD = OUTLINE_PREVIEW.replace("本節では, 書き込みの経路を説明する.",
+                                       "書き込みは, 3段の関数を通ってページに届く.")
+
+MERMAID_GOOD = """書き込みは, 空きがあれば追記し, 無ければページを確保する.
+
+```mermaid
+flowchart TD
+    W[書き込み] --> Q{空きがあるか}
+    Q -->|ある| A[追記する]
+    Q -->|無い| N[ページを確保する]
+```
+
+追記の枝では, ページの数は変わらない.
+"""
+
+
+def mermaid_doc(body, lead="開始から処理を経て終了する.", after="図は流れを示す."):
+    return f"{lead}\n\n```mermaid\n{body}\n```\n\n{after}\n"
+
+
+class LintNewChecks(Fixture):
+    def test_fence_after_heading_fails(self):
+        text = LEAD_DOC.replace("次のコードは, 変数を宣言する.\n\n", "")
+        rc, out = self.lint(text, "--no-info")
+        self.assertEqual(rc, 1)
+        self.assertIn("リード文", out)
+
+    def test_fence_with_lead_passes(self):
+        rc, out = self.lint(LEAD_DOC, "--no-info")
+        self.assertEqual(rc, 0, out)
+
+    def test_fence_at_document_start_fails(self):
+        rc, out = self.lint("```c\nint x;\n```\n", "--no-info")
+        self.assertEqual(rc, 1)
+        self.assertIn("文書の先頭", out)
+
+    def test_consecutive_fences_info(self):
+        rc, out = self.lint(LEAD_DOC + "\n```c\nint y;\n```\n")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("直前が別のコードブロック", out)
+
+    def test_phrase_lists_info(self):
+        text = ("# 試験\n\n試験は, 検査を確かめる文書である.\n"
+                "ページテーブルの最上位の表の要素を読む.\n"
+                "書き込み失敗時再試行処理実行前に解放する.\n"
+                "この関数は, 再試行を可能にする.\n"
+                "関数を叩くと戻る.\n"
+                "この処理は心臓部である.\n")
+        _, out = self.lint(text)
+        for needle in ("[J1]", "[J2]", "[J3]", "[J4]", "[J5]"):
+            self.assertIn(needle, out, needle)
+
+    def test_demonstrative_is_not_no_chain(self):
+        _, out = self.lint("# 試験\n\n試験は, その値の表を読む操作である.\n")
+        self.assertNotIn("[J3]", out)
+
+    def test_bold_labels_info(self):
+        text = "# 試験\n\n試験は, 検査の文書である.\n\n- **期限**: 明日\n- **担当**: 私\n- **場所**: 東京\n"
+        _, out = self.lint(text)
+        self.assertIn("太字のラベル", out)
+
+    def test_label_value_line_is_not_a_sentence(self):
+        text = GOOD_DOC.replace("# 赤黒木\n\n", "# 赤黒木\n\n対象: Linux 7.2.8, x86-64\n\n")
+        rc, out = self.lint(text, "--profile", "tech", "--no-info")
+        self.assertEqual(rc, 0, out)
+
+    def test_good_document_has_no_phrase_info(self):
+        _, out = self.lint(GOOD_DOC)
+        self.assertNotIn("[J", out)
+
+
+class Outline(Fixture):
+    def outline(self, text, *args):
+        return run(OUTLINE, list(args) + [self.write(text)])
+
+    def test_prints_skeleton(self):
+        rc, out = self.outline(OUTLINE_GOOD)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("H2 経路", out)
+        self.assertIn("冒頭: 書き込みは, 3段の関数を通ってページに届く.", out)
+
+    def test_preview_opening_fails(self):
+        rc, out = self.outline(OUTLINE_PREVIEW)
+        self.assertEqual(rc, 1)
+        self.assertIn("予告", out)
+
+    def test_single_paragraph_section_info(self):
+        _, out = self.outline(OUTLINE_GOOD + "\n## 小節\n\n本文である.\n")
+        self.assertIn("1段落だけの節: 小節", out)
+
+    def test_genre_required_elements(self):
+        cases = (
+            ("writeup", "フラグの記述が無い", OUTLINE_GOOD + "\nフラグは `flag{x}` である.\n"),
+            ("paper", "書誌情報", OUTLINE_GOOD + "\narXiv:2401.00001 (2024)\n"),
+            ("blog", "環境と版の記述が無い",
+             OUTLINE_GOOD.replace("操作である.", "操作である.\n環境: Linux 6.8.")),
+            ("internals", "'対象:' の行が無い",
+             "---\nsource_version: \"linux-7.2.8\"\n---\n" + OUTLINE_GOOD),
+        )
+        for genre, needle, fixed in cases:
+            _, out = self.outline(OUTLINE_GOOD, "--genre", genre)
+            self.assertIn(needle, out, genre)
+            _, out = self.outline(fixed, "--genre", genre)
+            self.assertNotIn(needle, out, genre)
+
+
+class Mermaid(Fixture):
+    def test_good_figure_has_no_info(self):
+        rc, out = self.diag(MERMAID_GOOD)
+        self.assertEqual(rc, 0, out)
+        for needle in ("[F1]", "[F2]", "[M1]", "[P3]"):
+            self.assertNotIn(needle, out, needle)
+
+    def test_emoji_and_icon_fail(self):
+        rc, out = self.diag(mermaid_doc("flowchart LR\n    A[\U0001F680 開始] --> B[終了]"))
+        self.assertEqual(rc, 1)
+        self.assertIn("絵文字", out)
+        rc, out = self.diag(mermaid_doc("flowchart LR\n    A[fa:fa-car 開始] --> B[終了]"))
+        self.assertEqual(rc, 1)
+        self.assertIn("アイコン", out)
+
+    def test_style_is_info(self):
+        rc, out = self.diag(mermaid_doc("flowchart LR\n    classDef hot fill:#f96\n    A[開始] --> B[終了]\n    A --> C[処理]"))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("[F2]", out)
+
+    def test_linear_flowchart_is_m1(self):
+        _, out = self.diag(mermaid_doc("flowchart LR\n    A[開始] --> B[処理] --> C[終了]"))
+        self.assertIn("[M1]", out)
+        _, out = self.diag(MERMAID_GOOD)
+        self.assertNotIn("[M1]", out)
+
+    def test_label_missing_from_prose(self):
+        body = "flowchart LR\n    A[wp] --> B[rp]\n    A --> C[head]"
+        _, out = self.diag(mermaid_doc(body, lead="本文は `head` を使う."))
+        self.assertIn("[F1]", out)
+        self.assertIn("'wp'", out)
+        self.assertNotIn("'head'", out)
+
+    def test_too_many_nodes(self):
+        body = "flowchart TD\n" + "\n".join(f"    N0 --> N{i}" for i in range(1, 11))
+        _, out = self.diag(mermaid_doc(body))
+        self.assertIn("ノードが 11 個", out)
+
+    def test_figure_without_reading_sentence(self):
+        text = mermaid_doc("flowchart LR\n    A[開始] --> B[終了]\n    A --> C[処理]", after="## 次の節")
+        _, out = self.diag(text)
+        self.assertIn("[P3]", out)
+
+    def test_adjacent_figures_share_context(self):
+        text = ("ページ `PgA` を確保する.\n\n```text\n[S0] before\n+-----+\n| PgA |\n+-----+\n```\n\n"
+                "```text\n[S1] after\n+-----+\n| PgA |\n+-----+\n```\n\n図は確保の前後を示す.\n")
+        _, out = self.diag(text)
+        self.assertNotIn("[F1]", out)
+
+
+class ExcerptShape(Fixture):
+    def doc(self, code, ref="`src/a.c:3-4`", lead="から抜粋する."):
+        return f"# 抜粋\n\n{ref} {lead}\n\n```c\n{code}```\n"
+
+    def test_runs_without_tree(self):
+        rc, out = run(EXCERPT, [self.write(self.doc("int x = 1;\n"))])
+        self.assertEqual(rc, 0, out)
+        self.assertIn("照合は行わない", out)
+
+    def test_long_excerpt_info(self):
+        _, out = run(EXCERPT, [self.write(self.doc("int x; /* 宣言 */\n" * 31))])
+        self.assertIn("[Q1]", out)
+
+    def test_unannotated_excerpt_info(self):
+        _, out = run(EXCERPT, [self.write(self.doc("int x;\n" * 10))])
+        self.assertIn("[Q2]", out)
+        _, out = run(EXCERPT, [self.write(self.doc("int x; /* 読む点 */\n" + "int x;\n" * 9))])
+        self.assertNotIn("[Q2]", out)
+
+    def test_authored_code_needs_no_source(self):
+        text = "# 抜粋\n\n次の説明用のコードを示す.\n\n```c\nint x;\n```\n"
+        _, out = run(EXCERPT, [self.write(text)])
+        self.assertNotIn("出典(パス:行番号)", out)
+
+    def test_python_reference_is_checked(self):
+        os.makedirs(os.path.join(self.tmp.name, "src"), exist_ok=True)
+        with open(os.path.join(self.tmp.name, "src", "a.py"), "w", encoding="utf-8") as f:
+            f.write("def f():\n    return 1  # one\n")
+        good = "# 抜粋\n\n`src/a.py:1-2` から抜粋する.\n\n```python\ndef f():\n    return 1  # 1 を返す\n```\n"
+        rc, out = run(EXCERPT, ["--tree", self.tmp.name, self.write(good)])
+        self.assertEqual(rc, 0, out)
+        rc, out = run(EXCERPT, ["--tree", self.tmp.name, self.write(good.replace("return 1", "return 2"))])
+        self.assertEqual(rc, 1)
+
+
+class CheckDoc(Fixture):
+    def check(self, text, *args):
+        return run(CHECKDOC, list(args) + [self.write(text)])
+
+    def test_runs_all_tools(self):
+        rc, out = self.check(OUTLINE_PREVIEW)
+        self.assertEqual(rc, 1)
+        for name in ("lint_ja.py", "outline_ja.py", "check_diagrams.py", "check_excerpt.py"):
+            self.assertIn(f"== {name} ==", out)
+        self.assertIn("outline_ja.py=FAIL", out)
+
+    def test_good_document_passes(self):
+        rc, out = self.check(OUTLINE_GOOD, "--no-info")
+        self.assertEqual(rc, 0, out)
+
+    def test_genre_selects_tech_profile(self):
+        rc, out = self.check(TECH_DOC, "--genre", "internals")
+        self.assertEqual(rc, 1)
+        self.assertIn("絶対パス", out)
+        _, out = self.check(TECH_DOC, "--genre", "general")
+        self.assertNotIn("絶対パス", out)
+
+    def test_source_tree_from_frontmatter(self):
+        os.makedirs(os.path.join(self.tmp.name, "src"), exist_ok=True)
+        with open(os.path.join(self.tmp.name, "src", "a.c"), "w", encoding="utf-8") as f:
+            f.write(SOURCE_C)
+        text = (f"---\nsource_tree: {self.tmp.name}\n---\n# 抜粋\n\n抜粋は, 実装の一部である.\n\n"
+                "`src/a.c:3-4` から抜粋する.\n\n```c\nint x = 2;\n```\n\n値は 2 になる.\n")
+        rc, out = self.check(text, "--genre", "internals")
+        self.assertEqual(rc, 1)
+        self.assertIn("にない行", out)
+
+
 class SkillIntegrity(unittest.TestCase):
-    """作業中の巻き戻しを検出する."""
+    """作業中の巻き戻しと, 参照先の欠落を検出する."""
+
+    def docs(self):
+        paths = [os.path.join(SKILL, "SKILL.md")]
+        for root, _, files in os.walk(os.path.join(SKILL, "references")):
+            paths += [os.path.join(root, f) for f in files if f.endswith(".md")]
+        return paths
 
     def test_skill_md_references_existing_files(self):
         with open(os.path.join(SKILL, "SKILL.md"), encoding="utf-8") as f:
@@ -278,10 +535,33 @@ class SkillIntegrity(unittest.TestCase):
         self.assertTrue(refs)
         for ref in refs:
             self.assertTrue(os.path.exists(os.path.join(SKILL, ref)), ref)
-        for ref in ("references/explainer.md", "references/memory-layout.md",
-                    "scripts/lint_ja.py"):
+        for ref in ("references/document-design.md", "references/memory-layout.md",
+                    "scripts/check_doc.py"):
             self.assertIn(ref, text)
             self.assertTrue(os.path.exists(os.path.join(SKILL, ref)), ref)
+
+    def test_cross_references_exist(self):
+        import re
+        for path in self.docs():
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            for ref in re.findall(r"`((?:references|scripts)/[\w./-]+\.(?:md|py))`", text):
+                self.assertTrue(os.path.exists(os.path.join(SKILL, ref)), f"{path}: {ref}")
+
+    def test_no_references_to_removed_files(self):
+        removed = ("references/" + "structure.md", "references/" + "explainer.md",
+                   "implementation-" + "explanations")
+        for path in self.docs() + [os.path.join(HERE, f) for f in os.listdir(HERE)
+                                   if f.endswith(".py") and f != "test_lint.py"]:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            for name in removed:
+                self.assertNotIn(name, text, f"{path}: {name}")
+
+    def test_skill_md_is_short(self):
+        with open(os.path.join(SKILL, "SKILL.md"), encoding="utf-8") as f:
+            self.assertLessEqual(len(f.read().rstrip("\n").split("\n")), 110)
+
 
 
 if __name__ == "__main__":

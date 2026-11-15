@@ -8,6 +8,8 @@
 --all は同じ種類の FAIL を省略せずに全件表示する(既定は種類ごとに15件).
 --profile tech は実装を読む技術資料向けの検査(作業環境の絶対パスなど)を足す.
 既定の general は会話や一般文書向けで, 技術資料向けの検査を行わない.
+コードブロックと図の前のリード文, `の` の連続, 漢語の詰まり, 直訳語, 比喩の動詞,
+評価だけの語, 太字ラベルの箇条書きも検査する. 語の一覧は bad_statements.md の J 系と対応する.
 FAIL があれば終了コード 1. INFO は人手で確認する参考出力.
 """
 import argparse
@@ -37,7 +39,7 @@ WORKLOG = re.compile(
     r"(指定された|指定ソース|ユーザー指定|今回|作業範囲|確認した|"
     r"実施していない|未実施|行っていない|この会話|先ほど|前回)"
 )
-EMPTY_HEADING = re.compile(r"(中核|その他|まとめ|メモ(?!リ)|雑記)")
+EMPTY_HEADING = re.compile(r"(中核|その他|まとめ|(?<![一-龥ァ-ヶ])メモ(?!リ)|雑記)")
 DEFINITION = re.compile(r"(とは|である\.|を指す\.|を表す\.|をいう\.)")
 KEEP_ENGLISH = {
     "Linux", "Rust", "Kconfig", "Makefile", "Git", "GitHub", "Obsidian",
@@ -49,6 +51,22 @@ VARIANT_PAIRS = [
     ("slot", "スロット"), ("node", "ノード"), ("key", "キー"),
     ("lock", "ロック"), ("thread", "スレッド"), ("pointer", "ポインタ"),
 ]
+# bad_statements.md の J1, J2, J5 に対応する語. INFO で示す.
+PHRASE_LISTS = (
+    ("J1", "直訳語", ("を可能にする", "を可能とする", "を実現する", "を担保する", "を活用する")),
+    ("J2", "比喩の動詞", ("を叩く", "を叩い", "を叩け", "を握る", "を握っ", "が刺さる", "が刺さっ",
+                        "を潰す", "を潰し", "を食わせ")),
+    ("J5", "AI 口調と評価だけの語", ("心臓部", "鍵となる", "鍵を握る", "肝となる", "本質的に", "シームレス",
+                                  "堅牢", "包括的", "画期的", "と言えるでしょう", "ことが重要です",
+                                  "見ていきましょう", "いかがでしたか", "について解説します")),
+)
+DEMONSTRATIVE = re.compile(r"(その|この|あの|どの|もの)")
+NO_CHAIN = re.compile(r"(?:[^\s,.の()]{1,12}の){3}[^\s,.の()]")
+KANJI_RUN = re.compile(r"[一-龥々]{7,}")
+BOLD_LABEL = re.compile(r"^\s*(?:[-*+]|\d+\.)\s+\*\*[^*]+\*\*\s*[:：]")
+FENCE_OPEN = re.compile(r"^\s*```")
+# `対象: Linux 7.2.8, x86-64` のようなラベルと値の行. 文の検査(体言止め, 長文)から外す.
+LABEL_LINE = re.compile(r"^[^\s,.:`]{1,10}:\s")
 ABS_PATH = re.compile(r"(?<![\w.~])/(?:root|home|mnt|Users)/[\w.\-/]+")
 ACRONYM = re.compile(r"\b[A-Z][A-Z0-9]{2,}\b")
 ACRONYM_DEFINED = re.compile(r"(\(|（|とは|の略|を表す|を指す|である)")
@@ -133,6 +151,51 @@ def sentences_of(buffer):
     return [p for p in parts if p]
 
 
+def check_fence_leads(lines, fails, infos):
+    """コードブロックと図の直前に, 目的を示す文があるかを調べる."""
+    in_fence = False
+    start = 0
+    if lines and lines[0] == "---":
+        for i in range(1, len(lines)):
+            if lines[i] == "---":
+                start = i + 1
+                break
+    prev_kind = "start"
+    for i in range(start, len(lines)):
+        line = lines[i]
+        if FENCE_OPEN.match(line):
+            if not in_fence:
+                n = i + 1
+                if prev_kind in ("start", "heading"):
+                    where = "文書の先頭" if prev_kind == "start" else "見出しの直後"
+                    fails.append((n, f"{where}にコードブロックや図がある. 前に目的を示すリード文を書く",
+                                  "リード文"))
+                elif prev_kind == "fence":
+                    infos.append((n, "直前が別のコードブロック. 間に説明を書けないか確認"))
+                in_fence = True
+            else:
+                in_fence = False
+                prev_kind = "fence"
+            continue
+        if in_fence or not line.strip():
+            continue
+        prev_kind = "heading" if HEADING.match(line.strip()) else "prose"
+
+
+def check_phrases(n, text, infos):
+    """J 系の語の一覧と, `の` の連続, 漢語の詰まりを INFO で示す."""
+    for pid, name, words in PHRASE_LISTS:
+        for w in words:
+            if w in text:
+                infos.append((n, f"[{pid}] {name} '{w}'. 何がどう動くかを書けないか確認"))
+                break
+    chain = NO_CHAIN.search(DEMONSTRATIVE.sub("X", text))
+    if chain:
+        infos.append((n, f"[J3] 'の' が3回続く: {chain.group(0)}"))
+    for m in KANJI_RUN.finditer(text):
+        infos.append((n, f"[J4] 漢字が {len(m.group(0))} 字続く: {m.group(0)}. 助詞を補ってほどけないか確認"))
+
+
 def check_file(path, show_info, max_width, allow_log, show_all, profile="general"):
     with open(path, encoding="utf-8") as f:
         lines = f.read().split("\n")
@@ -149,6 +212,8 @@ def check_file(path, show_info, max_width, allow_log, show_all, profile="general
     tech = profile == "tech"
     section_forward = 0
     seen_acronyms = {}
+    bold_labels = []
+    check_fence_leads(lines, fails, infos)
 
     def flush():
         nonlocal buffer
@@ -212,7 +277,9 @@ def check_file(path, show_info, max_width, allow_log, show_all, profile="general
                 continue
             if title is not None:
                 prose_after_title.append(body)
-            if buffer.rstrip().endswith(","):
+            if LABEL_LINE.match(body):
+                flush()
+            elif buffer.rstrip().endswith(","):
                 buffer += " " + body
             else:
                 flush()
@@ -238,6 +305,9 @@ def check_file(path, show_info, max_width, allow_log, show_all, profile="general
 
         if re.search(r"\s/\s", text_plain):
             fails.append((n, "' / ' で語を並べず, 文か箇条書きで書く", "スラッシュ列挙"))
+        check_phrases(n, text_plain, infos)
+        if BOLD_LABEL.match(line):
+            bold_labels.append(n)
         if not allow_log:
             m = WORKLOG.search(text_plain)
             if m:
@@ -316,6 +386,10 @@ def check_file(path, show_info, max_width, allow_log, show_all, profile="general
         undefined = [f"{w}({n})" for w, (n, ok) in seen_acronyms.items() if not ok]
         if undefined:
             infos.append((0, "初出で定義が近くにない略語: " + ", ".join(undefined[:20])))
+
+    if len(bold_labels) >= 3:
+        infos.append((bold_labels[0], f"太字のラベルで始まる箇条書きが {len(bold_labels)} 項目ある. "
+                      "ラベルを文に入れるか, 表にできないか確認"))
 
     if first_ascii:
         words = ", ".join(f"{w}({n})" for n, w in first_ascii.values())
